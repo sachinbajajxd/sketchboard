@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { useSelector, useDispatch } from 'react-redux';
-
+import { socket } from "@/socket";
 import { MENU_ITEMS } from "@/constants";
 import { actionItemClick } from '@/slice/menuSlice'
 
@@ -48,8 +48,17 @@ const Board = () => {
             context.strokeStyle=color;
             context.lineWidth=size;
         }
+
+        const handleChangeConfig = (config) => {
+            changeConfig(config.color, config.size);
+        }
         
         changeConfig(color, size);
+        socket.on('changeConfig', handleChangeConfig);
+
+        return () => {
+            socket.off('changeConfig', handleChangeConfig);
+        }
 
     }, [color, size]);
 
@@ -82,22 +91,49 @@ const Board = () => {
             //draw
             if(!shouldDraw.current) return;
             drawLine(e.clientX, e.clientY);
+            socket.emit('drawLine', {x: e.clientX, y: e.clientY});
         }
 
         const handleMouseDown = (e) => {
             //start
             shouldDraw.current=true;
             beginPath(e.clientX, e.clientY);
+            socket.emit('beginPath', {x: e.clientX, y: e.clientY});
+        }
+
+        const handleBeginPath = (path) => {
+            beginPath(path.x, path.y)
+        }
+
+        const handleDrawLine = (path) => {
+            drawLine(path.x, path.y)
         }
 
         canvas.addEventListener('mousedown', handleMouseDown);
         canvas.addEventListener('mousemove', handleMouseMove);
         canvas.addEventListener('mouseup', handleMouseUp);
 
+        
+        canvas.addEventListener('touchstart', handleMouseDown);
+        canvas.addEventListener('touchmove', handleMouseMove);
+        canvas.addEventListener('touchend', handleMouseUp);
+
+        socket.on('beginPath', handleBeginPath);
+        socket.on('drawLine', handleDrawLine);
+
+
         return () => {
             canvas.removeEventListener('mousedown', handleMouseDown);
             canvas.removeEventListener('mousemove', handleMouseMove);
             canvas.removeEventListener('mouseup', handleMouseUp);
+
+            
+            canvas.removeEventListener('touchstart', handleMouseDown);
+            canvas.removeEventListener('touchmove', handleMouseMove);
+            canvas.removeEventListener('touchend', handleMouseUp);
+
+            socket.off('beginPath', handleBeginPath);
+            socket.off('drawLine', handleDrawLine);
         }
     }, []);
 
